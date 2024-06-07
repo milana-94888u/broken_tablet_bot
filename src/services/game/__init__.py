@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from services.user.schemas import UserData
-
 from .schemas import GameData
 
 
@@ -20,7 +18,9 @@ class GameService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_game(self, game_id: UUID, user_id: UUID) -> None:
+    async def start_game(self, game_id: UUID, user_id: UUID) -> GameData:
         raise NotImplementedError
 
-
+    @abstractmethod
+    async def get_game_data(self, game_id: UUID) -> GameData:
+        raise NotImplementedError

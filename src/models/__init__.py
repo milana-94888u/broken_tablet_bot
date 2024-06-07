@@ -1,1 +1,1 @@
-from .models import User, Game, UserInGame
+from .models import User, Game, UserInGame, GameStatus

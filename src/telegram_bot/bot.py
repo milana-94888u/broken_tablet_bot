@@ -1,9 +1,11 @@
 import asyncio
+from uuid import UUID
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.utils.deep_linking import create_start_link
+from aiogram.fsm.context import FSMContext
 
 from services.user import UserService, UserData
 from services.game import GameService, GameData
@@ -11,6 +13,8 @@ from services.game import GameService, GameData
 from telegram_bot.config import settings
 from telegram_bot.middlewares.service_dependencies import UserServiceDependencyMiddleware, GameServiceDependencyMiddleware
 from telegram_bot.middlewares.user_registration import RegistrationMiddleware
+from telegram_bot.handlers import router
+from telegram_bot.states import GameInteractions
 
 
 dp = Dispatcher()
@@ -19,19 +23,17 @@ bot = Bot(settings.api_token)
 
 @dp.message(Command("create_game"))
 async def create_game(message: Message, game_service: GameService, user_data: UserData) -> None:
-    game_data = await game_service.create_game("test", user_data.id)
-    print(game_data)
+    game_data = await game_service.create_game("test", user_data.user_id)
+    await message.reply(f"The game {game_data.name} is created at {game_data.created_at}"
+                        f"\nJoin link is {await create_start_link(bot, str(game_data.game_id))}")
 
 
-@dp.message(Command("my_games"))
-async def my_games(message: Message, user_service: UserService, user_data: UserData) -> None:
-    games = await user_service.get_all_user_games(user_data.id)
-    buttons = [
-        [InlineKeyboardButton(
-            text=f"{game.name} ({game.created_at})", callback_data=str(game.game_id)
-        )] for game in games
-    ]
-    await message.reply("Your games:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+@dp.message(GameInteractions.interacting_with_game, Command("start_game"))
+async def start_game(message: Message, state: FSMContext, game_service: GameService, user_data: UserData) -> None:
+    state_data = await state.get_data()
+    game_id = state_data["game_id"]
+    game_data = await game_service.start_game(game_id, user_data.user_id)
+    await message.reply(f"You've started the game {game_data.game_id}, players are {game_data.users_in_game}, created at {game_data.created_at}, status is {game_data.status}")
 
 
 async def change_game_context() -> None:
@@ -39,16 +41,20 @@ async def change_game_context() -> None:
 
 
 @dp.message(CommandStart(deep_link=True))
-async def start_handler(message: Message, command: CommandObject, user_data: UserData) -> None:
+async def new_user_handler(
+        message: Message, command: CommandObject, game_service: GameService, user_data: UserData
+) -> None:
     args = command.args
-    await message.reply(f"Your payload is {args}, your id is {user_data.id}")
+    await game_service.register_user_to_game(game_id=UUID(args), user_id=user_data.user_id)
+    await message.reply(f"You've been registered to the game!")
 
 
 async def main() -> None:
     print(await create_start_link(bot, "game"))
-    dp.message.middleware(UserServiceDependencyMiddleware())
-    dp.message.middleware(GameServiceDependencyMiddleware())
-    dp.message.middleware(RegistrationMiddleware())
+    dp.include_router(router)
+    dp.update.middleware(UserServiceDependencyMiddleware())
+    dp.update.middleware(GameServiceDependencyMiddleware())
+    dp.update.middleware(RegistrationMiddleware())
     await dp.start_polling(bot)
 
 

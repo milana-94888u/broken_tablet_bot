@@ -16,7 +16,7 @@ class UserServiceImplementation(UserService):
             statement = select(User).filter_by(telegram_user_id=telegram_user_id)
             result = await session.scalars(statement)
             if user := result.one_or_none():
-                return UserData(id=user.user_id, telegram_id=user.telegram_user_id)
+                return UserData.model_validate(user)
             session.add(User(telegram_user_id=telegram_user_id))
             await session.commit()
 
