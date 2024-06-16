@@ -25,7 +25,9 @@ class User(Base):
     user_id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     telegram_user_id: Mapped[Annotated[int, mapped_column(index=True)]]
 
-    games: Mapped[list["Game"]] = relationship(secondary=lambda: UserInGame.__table__, back_populates="users")
+    games: Mapped[list["Game"]] = relationship(
+        secondary=lambda: UserInGame.__table__, back_populates="users"
+    )
     game_registrations: Mapped[list["UserInGame"]] = relationship(back_populates="user")
 
 
@@ -34,15 +36,21 @@ class Game(Base):
     name: Mapped[str_with_length(50)] = mapped_column(nullable=True)
     max_players: Mapped[int] = mapped_column(default=8)
     status: Mapped[GameStatus] = mapped_column(default=GameStatus.PENDING)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
     current_turn: Mapped[int] = mapped_column(default=-1)
 
-    users: Mapped[list["User"]] = relationship(secondary=lambda: UserInGame.__table__, back_populates="games")
-    users_in_game: Mapped[list["UserInGame"]] = relationship(back_populates="game")
+    users: Mapped[list["User"]] = relationship(
+        secondary=lambda: UserInGame.__table__, back_populates="games"
+    )
+    users_in_game: Mapped[list["UserInGame"]] = relationship(
+        back_populates="game", order_by=lambda: UserInGame.turn_number
+    )
 
 
 class UserInGame(Base):

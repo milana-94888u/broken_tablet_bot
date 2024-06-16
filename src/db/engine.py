@@ -9,4 +9,6 @@ from .config import settings
 
 
 engine = create_async_engine(url=settings.url, echo=settings.echo)
-session_factory = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+session_factory = async_sessionmaker(
+    bind=engine, autoflush=False, expire_on_commit=False
+)

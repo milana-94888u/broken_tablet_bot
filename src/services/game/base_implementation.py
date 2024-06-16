@@ -1,5 +1,7 @@
 from uuid import UUID
 from random import shuffle
+from datetime import datetime, UTC
+from typing import Self
 
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -8,12 +10,102 @@ from db import session_factory
 from models import Game, UserInGame, GameStatus
 
 from . import GameService, GameData
+from services.user_notification import UserNotificationService
+from services.user import UserData
 
 
 class GameServiceImplementation(GameService):
+    async def process_acknowledged_task(self, game_id: UUID, user_id: UUID) -> None:
+        async with session_factory() as session:
+            statement = (
+                select(Game)
+                .filter_by(game_id=game_id)
+                .options(joinedload(Game.users_in_game))
+                .options(joinedload(Game.users))
+            )
+            result = await session.scalars(statement)
+            game = result.unique().one_or_none()
+
+            if game.status != GameStatus.ACTIVE:
+                raise ValueError("The game is not active")
+
+            if 0 <= game.current_turn < len(game.users_in_game):
+                if game.users_in_game[game.current_turn].user_id != user_id:
+                    raise ValueError("Incorrect user id passed")
+                current_user: UserInGame = game.users_in_game[game.current_turn]
+                current_user.task_received_at = datetime.now(UTC)
+                await session.commit()
+            else:
+                raise Exception("Error processing game turn")
+
+    def __init__(self, notification_service: UserNotificationService) -> None:
+        self.notification_service = notification_service
+
+    async def get_current_player(self, game_id: UUID) -> UserData:
+        async with session_factory() as session:
+            statement = (
+                select(Game)
+                .filter_by(game_id=game_id)
+                .options(joinedload(Game.users_in_game))
+                .options(joinedload(Game.users))
+            )
+            result = await session.scalars(statement)
+            game = result.unique().one_or_none()
+
+            if game.status != GameStatus.ACTIVE:
+                raise ValueError("The game is not active")
+
+            if 0 <= game.current_turn < len(game.users_in_game):
+                return UserData.model_validate(
+                    game.users_in_game[game.current_turn].user
+                )
+            raise Exception("Error processing game turn")
+
+    async def proceed_next_turn(self, game_id: UUID) -> None:
+        async with session_factory() as session:
+            statement = (
+                select(Game)
+                .filter_by(game_id=game_id)
+                .options(joinedload(Game.users_in_game))
+                .options(joinedload(Game.users))
+            )
+            result = await session.scalars(statement)
+            game = result.unique().one_or_none()
+
+            if game.current_turn < 0:  # first turn
+                game.current_turn = 0
+                user_in_game: UserInGame = game.users_in_game[game.current_turn]
+                user_in_game.task_received_at = datetime.now(UTC)
+                current_user = UserData.model_validate(
+                    game.users_in_game[game.current_turn].user
+                )
+                await self.notification_service.notify_next_player(
+                    GameData.model_validate(game), current_user
+                )
+            elif game.current_turn < len(game.users_in_game) - 1:  # not last turn
+                game.current_turn += 1
+                user_in_game: UserInGame = game.users_in_game[game.current_turn]
+                user_in_game.task_received_at = datetime.now(UTC)
+                current_user = UserData.model_validate(
+                    game.users_in_game[game.current_turn].user
+                )
+                await self.notification_service.notify_next_player(
+                    GameData.model_validate(game), current_user
+                )
+            else:  # game finished
+                await self.notification_service.notify_game_finished(
+                    GameData.model_validate(game)
+                )
+            await session.commit()
+
     async def get_game_data(self, game_id: UUID) -> GameData:
         async with session_factory() as session:
-            statement = select(Game).filter_by(game_id=game_id).options(joinedload(Game.users_in_game)).options(joinedload(Game.users))
+            statement = (
+                select(Game)
+                .filter_by(game_id=game_id)
+                .options(joinedload(Game.users_in_game))
+                .options(joinedload(Game.users))
+            )
             result = await session.scalars(statement)
             game = result.unique().one_or_none()
 
@@ -21,7 +113,12 @@ class GameServiceImplementation(GameService):
 
     async def start_game(self, game_id: UUID, user_id: UUID) -> GameData:
         async with session_factory() as session:
-            statement = select(Game).filter_by(game_id=game_id).options(joinedload(Game.users_in_game)).options(joinedload(Game.users))
+            statement = (
+                select(Game)
+                .filter_by(game_id=game_id)
+                .options(joinedload(Game.users_in_game))
+                .options(joinedload(Game.users))
+            )
             result = await session.scalars(statement)
             game = result.unique().one_or_none()
             game.status = GameStatus.ACTIVE
@@ -31,6 +128,8 @@ class GameServiceImplementation(GameService):
                 user_in_game: UserInGame
                 user_in_game.turn_number = turn_number
             await session.commit()
+
+            await self.proceed_next_turn(game_id)
 
             return GameData.model_validate(game)
 
@@ -48,7 +147,9 @@ class GameServiceImplementation(GameService):
             user_in_game = result.one_or_none()
             if user_in_game:
                 raise Exception("User already registered")
-            user_in_game = UserInGame(game_id=game_id, user_id=user_id, permissions={"user": True})
+            user_in_game = UserInGame(
+                game_id=game_id, user_id=user_id, permissions={"user": True}
+            )
             session.add(user_in_game)
             await session.commit()
 
@@ -63,4 +164,4 @@ class GameServiceImplementation(GameService):
             session.add_all([game, creator])
             await session.commit()
 
-            return GameData.model_validate(game)
+            return await self.get_game_data(game.game_id)

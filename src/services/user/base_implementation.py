@@ -25,7 +25,10 @@ class UserServiceImplementation(UserService):
     async def get_all_user_games(self, user_id: UUID) -> list[GameData]:
         async with session_factory() as session:
             statement = (
-                select(User).filter_by(user_id=user_id).options(joinedload(User.games).joinedload(Game.users_in_game)).options(joinedload(User.games).joinedload(Game.users))
+                select(User)
+                .filter_by(user_id=user_id)
+                .options(joinedload(User.games).joinedload(Game.users_in_game))
+                .options(joinedload(User.games).joinedload(Game.users))
             )
             result = await session.scalars(statement)
             user = result.unique().one_or_none()

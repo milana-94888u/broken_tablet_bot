@@ -24,3 +24,15 @@ class GameService(ABC):
     @abstractmethod
     async def get_game_data(self, game_id: UUID) -> GameData:
         raise NotImplementedError
+
+    @abstractmethod
+    async def proceed_next_turn(self, game_id: UUID) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_current_player(self, game_id: UUID) -> UUID:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def process_acknowledged_task(self, game_id: UUID, user_id: UUID) -> None:
+        raise NotImplementedError
