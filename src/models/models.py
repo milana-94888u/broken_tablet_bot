@@ -62,5 +62,7 @@ class UserInGame(Base):
     task_received_at: Mapped[datetime] = mapped_column(nullable=True)
     task_completed_at: Mapped[datetime] = mapped_column(nullable=True)
 
+    path_to_artwork: Mapped[str] = mapped_column(nullable=True)
+
     game: Mapped["Game"] = relationship(back_populates="users_in_game")
     user: Mapped["User"] = relationship(back_populates="game_registrations")
