@@ -26,7 +26,9 @@ class GameService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def proceed_next_turn(self, game_id: UUID) -> None:
+    async def proceed_next_turn(
+        self, game_id: UUID, prev_artwork_path: str | None = None
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -35,4 +37,12 @@ class GameService(ABC):
 
     @abstractmethod
     async def process_acknowledged_task(self, game_id: UUID, user_id: UUID) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def process_completed_task(self, game_id: UUID, user_id: UUID) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def finish_game(self, game_id: UUID) -> None:
         raise NotImplementedError

@@ -2,7 +2,7 @@ import asyncio
 from uuid import UUID
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, File
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.utils.deep_linking import create_start_link
 from aiogram.fsm.context import FSMContext
@@ -17,7 +17,7 @@ from telegram_bot.middlewares.service_dependencies import (
     GameServiceDependencyMiddleware,
 )
 from telegram_bot.middlewares.user_registration import RegistrationMiddleware
-from telegram_bot.handlers import router
+from telegram_bot.handlers import router, artwork_router
 from telegram_bot.states import GameInteractions
 
 
@@ -75,11 +75,18 @@ def get_user_fsm_context(telegram_user_id: int) -> FSMContext:
     )
 
 
+async def download_file(file_id: str, destination: str) -> None:
+    file = await bot.get_file(file_id)
+    await bot.download_file(file.file_path, destination)
+
+
 async def main() -> None:
     print(await create_start_link(bot, "game"))
-    dp.include_router(router)
+    dp.include_routers(router, artwork_router)
     dp.update.middleware(UserServiceDependencyMiddleware())
-    dp.update.middleware(GameServiceDependencyMiddleware(bot, get_user_fsm_context))
+    dp.update.middleware(
+        GameServiceDependencyMiddleware(bot, get_user_fsm_context, download_file)
+    )
     dp.update.middleware(RegistrationMiddleware())
     await dp.start_polling(bot)
 

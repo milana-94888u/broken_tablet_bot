@@ -11,7 +11,10 @@ class UserNotificationService(ABC):
 
     @abstractmethod
     async def notify_next_player(
-        self, game_data: GameData, user_data: UserData
+        self,
+        game_data: GameData,
+        user_data: UserData,
+        prev_artwork_path: str | None = None,
     ) -> None:
         raise NotImplementedError
 

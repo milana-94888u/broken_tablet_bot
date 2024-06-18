@@ -16,6 +16,8 @@ from services.game import GameService, GameData
 
 from telegram_bot.states import GameInteractions
 
+from telegram_bot.handlers.artwork_handlers import router as artwork_router
+
 
 router = Router()
 

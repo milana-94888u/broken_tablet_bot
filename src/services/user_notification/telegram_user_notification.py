@@ -2,7 +2,7 @@ from typing import Callable
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, BufferedInputFile
 
 from telegram_bot.handlers import TaskAcceptData
 from telegram_bot.states import GameInteractions
@@ -26,7 +26,10 @@ class TelegramUserNotificationService(UserNotificationService):
             )
 
     async def notify_next_player(
-        self, game_data: GameData, user_data: UserData
+        self,
+        game_data: GameData,
+        user_data: UserData,
+        prev_artwork_path: str | None = None,
     ) -> None:
         for user_in_game in game_data.users_in_game:
             if user_in_game.user.user_id != user_data.user_id:
@@ -42,11 +45,19 @@ class TelegramUserNotificationService(UserNotificationService):
                 )
             ]
         ]
-        await self.bot.send_message(
-            user_data.telegram_user_id,
-            f"Your turn now",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-        )
+        if prev_artwork_path:
+            await self.bot.send_photo(
+                user_data.telegram_user_id,
+                BufferedInputFile.from_file(prev_artwork_path),
+                caption="Your turn now, try to draw something above the blurred image",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
+        else:
+            await self.bot.send_message(
+                user_data.telegram_user_id,
+                f"Your turn now. It's the first turn, just draw anything you want",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
         state = self.user_fsm_context_receiver(user_data.telegram_user_id)
         await state.set_state(GameInteractions.waiting_for_task_acknowledge)
 
