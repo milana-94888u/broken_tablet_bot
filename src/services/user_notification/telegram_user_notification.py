@@ -2,7 +2,13 @@ from typing import Callable
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, BufferedInputFile
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    BufferedInputFile,
+    MessageEntity,
+    User,
+)
 
 from telegram_bot.handlers import TaskAcceptData
 from telegram_bot.states import GameInteractions
@@ -35,7 +41,19 @@ class TelegramUserNotificationService(UserNotificationService):
             if user_in_game.user.user_id != user_data.user_id:
                 await self.bot.send_message(
                     user_in_game.user.telegram_user_id,
-                    f"[This Player](tg://user?id={user_data.telegram_user_id})'s turn now. Waiting for accept",
+                    f"This Player's turn now. Waiting for accept",
+                    entities=[
+                        MessageEntity(
+                            type="text_mention",
+                            offset=0,
+                            length=13,
+                            user=User(
+                                id=user_data.telegram_user_id,
+                                is_bot=False,
+                                first_name="",
+                            ),
+                        )
+                    ],
                 )
         buttons = [
             [
